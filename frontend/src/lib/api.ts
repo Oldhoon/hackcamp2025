@@ -7,6 +7,8 @@ export interface ExerciseResults {
   completed: boolean;
 }
 
+export type ExerciseResultsResponse = ExerciseResults;
+
 export interface SessionStatus {
   mode: string;
   remaining_seconds: number;
@@ -18,6 +20,7 @@ export interface SessionStatus {
 export interface SessionConfig {
   focus_seconds: number;
   break_seconds: number;
+  mode?: string;
 }
 
 const API_BASE =
@@ -63,4 +66,3 @@ export const startSession = (config: SessionConfig) => {
 export const stopSession = () => {
   return request<{ status: string }>("/session/stop", { method: "POST" });
 };
-

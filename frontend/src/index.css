@@ -14,6 +14,12 @@ body {
   margin: 0 auto;
 }
 
+.grid.two-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
 .page {
   min-height: 100vh;
 }
@@ -59,6 +65,9 @@ body {
   text-align: right;
 }
 
+.text-center {
+  text-align: center;
+}
 .top-bar {
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
@@ -176,9 +185,25 @@ body {
   font-size: 0.9rem;
 }
 
+.btn-pill {
+  border-radius: 999px;
+}
+
+.stretch-btn {
+  min-width: 220px;
+  width: 100%;
+}
+
 .icon-left {
   margin-right: 0.4rem;
   vertical-align: middle;
+}
+
+.primary-cta {
+  background: linear-gradient(135deg, #2563eb, #4338ca);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.25);
 }
 
 .timer-display {
@@ -244,6 +269,12 @@ body {
   border: 1px solid #e5e7eb;
   font-size: 1rem;
   background: #fff;
+}
+
+.time-inputs input {
+  text-align: center;
+  font-weight: 600;
+  letter-spacing: 0.05em;
 }
 
 .badge {
@@ -369,6 +400,31 @@ body {
 
 .glow {
   box-shadow: 0 12px 40px rgba(249, 115, 22, 0.1), 0 4px 10px rgba(249, 115, 22, 0.08);
+}
+
+.setup-card {
+  position: relative;
+  padding: 2rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f8fbff, #eef5ff);
+  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.08);
+}
+
+.setup-badge {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2563eb, #4338ca);
+  display: grid;
+  place-items: center;
+  margin: 0 auto 0.75rem auto;
+  box-shadow: 0 15px 45px rgba(59, 130, 246, 0.35);
+}
+
+.setup-title {
+  margin: 0;
+  font-size: 1.6rem;
 }
 
 .spinner {

@@ -7,8 +7,8 @@ class PosePipeline:
     def __init__(
         self,
         camera_index: int = 0,
-        frame_width: int = 1280,
-        frame_height: int = 720,
+        frame_width: int = 640,
+        frame_height: int = 360,
         min_detection_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
         draw_landmarks: bool = True,

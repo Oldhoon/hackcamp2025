@@ -6,14 +6,33 @@ import { Card } from "./ui/card";
 
 interface TimerProps {
   sessionType: "focus" | "break";
-  duration?: number | string; // minutes
+  duration?: number | string; // minutes or "MM:SS"
   onSessionComplete: () => void;
 }
 
 export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) => {
-  const defaultDuration = sessionType === "focus" ? 50 : 10;
-  const parsedDuration = typeof duration === "string" ? Number(duration) : duration;
-  const initialTime = (parsedDuration || defaultDuration) * 60;
+  const defaultDurationMinutes = sessionType === "focus" ? 50 : 10;
+
+  const parseDurationToSeconds = (value?: number | string) => {
+    if (value === undefined || value === null || value === "") {
+      return defaultDurationMinutes * 60;
+    }
+    if (typeof value === "number") {
+      return value * 60;
+    }
+    const trimmed = value.trim();
+    if (/^\d+:\d{1,2}$/.test(trimmed)) {
+      const [m, s] = trimmed.split(":").map(Number);
+      return m * 60 + s;
+    }
+    const asNumber = Number(trimmed);
+    if (!Number.isNaN(asNumber)) {
+      return asNumber * 60;
+    }
+    return defaultDurationMinutes * 60;
+  };
+
+  const initialTime = parseDurationToSeconds(duration);
   const [timeLeft, setTimeLeft] = useState(initialTime);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -125,12 +144,13 @@ export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) 
           </div>
         </div>
 
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row" style={{ gap: "0.75rem", alignItems: "stretch" }}>
           <Button
             onClick={() => setIsRunning((v) => !v)}
             size="lg"
             variant={isRunning ? "secondary" : "default"}
-            className="flex-1"
+            className="flex-1 stretch-btn btn-pill"
+            style={{ fontSize: "1.05rem" }}
           >
             {isRunning ? (
               <>
@@ -144,7 +164,13 @@ export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) 
               </>
             )}
           </Button>
-          <Button onClick={() => { setTimeLeft(initialTime); setIsRunning(false); }} size="lg" variant="outline">
+          <Button
+            onClick={() => { setTimeLeft(initialTime); setIsRunning(false); }}
+            size="lg"
+            variant="outline"
+            className="btn-pill"
+            style={{ padding: "0.9rem 1.1rem", minWidth: "64px", justifyContent: "center" }}
+          >
             <RotateCcw />
           </Button>
         </div>

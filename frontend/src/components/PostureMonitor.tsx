@@ -3,7 +3,7 @@ import { fetchSessionStatus } from "../lib/api";
 import type { SessionStatus } from "../lib/api";
 import { Card } from "./ui/card";
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 1000;
 
 const labelCopy = {
   good: { title: "✨ good", message: "Excellent posture!" },
@@ -17,9 +17,7 @@ export const PostureMonitor = () => {
 
   useEffect(() => {
     let mounted = true;
-    let interval: number;
-
-    const poll = async () => {
+    const pollSession = async () => {
       try {
         const controller = new AbortController();
         const data = await fetchSessionStatus(controller.signal);
@@ -27,15 +25,15 @@ export const PostureMonitor = () => {
           setStatus(data);
           setError(null);
         }
-      } catch (err) {
+      } catch {
         if (mounted) {
           setError("Unable to reach posture tracker");
         }
       }
     };
 
-    poll();
-    interval = window.setInterval(poll, POLL_INTERVAL_MS);
+    pollSession();
+    const interval = window.setInterval(pollSession, POLL_INTERVAL_MS);
 
     return () => {
       mounted = false;
@@ -45,7 +43,8 @@ export const PostureMonitor = () => {
 
   const { scoreOutOf100, badge } = useMemo(() => {
     const raw = status?.posture_score ?? 0;
-    const normalized = Math.round(raw * 100);
+    // Accept posture_score as either 0-1 or 0-100
+    const normalized = Math.round(raw <= 1 ? raw * 100 : raw);
     let badge: keyof typeof labelCopy = "bad";
     if (normalized >= 75) {
       badge = "good";
@@ -55,7 +54,8 @@ export const PostureMonitor = () => {
     return { scoreOutOf100: normalized, badge };
   }, [status?.posture_score]);
 
-  const isActive = Boolean(status?.running && status?.mode === "focus");
+  // Consider any status response as "active" so we display the score even if running is false/idle.
+  const isActive = Boolean(status);
 
   return (
     <Card
@@ -97,7 +97,7 @@ export const PostureMonitor = () => {
             lineHeight: 1,
           }}
         >
-          {isActive ? scoreOutOf100 : "--"}
+          {isActive ? scoreOutOf100 : error ? "--" : "--"}
         </span>
         <p className="muted" style={{ margin: 0, letterSpacing: "0.08em" }}>
           POSTURE SCORE
@@ -114,6 +114,16 @@ export const PostureMonitor = () => {
         >
           <strong>{error ? error : labelCopy[badge].message}</strong>
         </div>
+        <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
+          {status
+            ? `mode: ${status.mode || "-"} · running: ${status.running ? "yes" : "no"}`
+            : "No status yet"}
+        </p>
+        {!isActive && !error && (
+          <p className="muted small" style={{ margin: 0, textAlign: "center" }}>
+            Start a focus session (and allow camera) to activate live posture tracking.
+          </p>
+        )}
       </div>
 
       <div className="column" style={{ gap: "0.75rem" }}>

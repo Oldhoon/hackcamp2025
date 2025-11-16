@@ -1,8 +1,8 @@
-# exercise_counter.py
+#https://github.com/Careless-Caramel/squat-counter/blob/main/MAIN.py
 from dataclasses import dataclass
 from typing import List, Dict, Any
 from pose_utils import find_angle, leg_state
-import mediapipe as mp
+
 
 
 @dataclass

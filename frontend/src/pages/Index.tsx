@@ -8,9 +8,11 @@ import { Card } from "../components/ui/card";
 import { Play, Settings } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { startSession, stopSession } from "../lib/api";
 
 const Index = () => {
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [isStartingSession, setIsStartingSession] = useState(false);
   const [focusDuration, setFocusDuration] = useState<string>("50");
   const [breakDuration, setBreakDuration] = useState<string>("10");
   const [stats, setStats] = useState({
@@ -21,7 +23,12 @@ const Index = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSessionComplete = () => {
+  const handleSessionComplete = async () => {
+    try {
+      await stopSession();
+    } catch (error) {
+      console.error("Failed to stop posture session:", error);
+    }
     setStats((prev) => ({
       ...prev,
       completedSessions: prev.completedSessions + 1,
@@ -33,7 +40,7 @@ const Index = () => {
     navigate(`/break?duration=${Number(breakDuration) || 10}`);
   };
 
-  const handleStartSession = () => {
+  const handleStartSession = async () => {
     const focusVal = Number(focusDuration);
     const breakVal = Number(breakDuration);
     if (!focusDuration || focusVal < 1 || !breakDuration || breakVal < 1) {
@@ -44,14 +51,35 @@ const Index = () => {
       });
       return;
     }
-    setSessionStarted(true);
-    toast({
-      title: "Session started! 🎯",
-      description: `${focusVal} min focus, then ${breakVal} min break`,
-    });
+    setIsStartingSession(true);
+    try {
+      await startSession({
+        focus_seconds: focusVal * 60,
+        break_seconds: breakVal * 60,
+      });
+      setSessionStarted(true);
+      toast({
+        title: "Session started! 🎯",
+        description: `${focusVal} min focus, then ${breakVal} min break`,
+      });
+    } catch (error) {
+      console.error("Failed to start posture session:", error);
+      toast({
+        title: "Unable to start session",
+        description: "Make sure the backend server is running.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStartingSession(false);
+    }
   };
 
-  const handleReconfigure = () => {
+  const handleReconfigure = async () => {
+    try {
+      await stopSession();
+    } catch (error) {
+      console.error("Failed to stop posture session:", error);
+    }
     setSessionStarted(false);
   };
 
@@ -118,7 +146,7 @@ const Index = () => {
                 </div>
               </div>
 
-              <Button onClick={handleStartSession} size="lg" className="w-full">
+              <Button onClick={handleStartSession} size="lg" className="w-full" disabled={isStartingSession}>
                 <Play className="icon-left" /> Start Focus Session
               </Button>
             </Card>

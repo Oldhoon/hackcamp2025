@@ -2,15 +2,29 @@
 import time
 import cv2
 from fastapi import FastAPI, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
+
 from pydantic import BaseModel
 
 from backend.exercise_counter import SquatCounter
 from backend.pose_pipeline import PosePipeline
 from backend.posture_detector import PostureDetector
 
-SHOW_PREVIEW = True
+SHOW_PREVIEW = False
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class SessionConfig(BaseModel):

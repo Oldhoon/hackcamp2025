@@ -144,12 +144,13 @@ export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) 
           </div>
         </div>
 
-        <div className="row" style={{ gap: "0.75rem" }}>
+        <div className="row" style={{ gap: "0.75rem", alignItems: "stretch" }}>
           <Button
             onClick={() => setIsRunning((v) => !v)}
             size="lg"
             variant={isRunning ? "secondary" : "default"}
-            className="flex-1"
+            className="flex-1 stretch-btn btn-pill"
+            style={{ fontSize: "1.05rem" }}
           >
             {isRunning ? (
               <>
@@ -163,7 +164,13 @@ export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) 
               </>
             )}
           </Button>
-          <Button onClick={() => { setTimeLeft(initialTime); setIsRunning(false); }} size="lg" variant="outline">
+          <Button
+            onClick={() => { setTimeLeft(initialTime); setIsRunning(false); }}
+            size="lg"
+            variant="outline"
+            className="btn-pill"
+            style={{ padding: "0.9rem 1.1rem", minWidth: "64px", justifyContent: "center" }}
+          >
             <RotateCcw />
           </Button>
         </div>

@@ -65,6 +65,9 @@ body {
   text-align: right;
 }
 
+.text-center {
+  text-align: center;
+}
 .top-bar {
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
@@ -180,6 +183,15 @@ body {
 .btn-sm {
   padding: 0.45rem 0.85rem;
   font-size: 0.9rem;
+}
+
+.btn-pill {
+  border-radius: 999px;
+}
+
+.stretch-btn {
+  min-width: 220px;
+  width: 100%;
 }
 
 .icon-left {

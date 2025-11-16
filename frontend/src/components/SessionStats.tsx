@@ -1,14 +1,12 @@
-import { TrendingUp, Target, Zap } from "lucide-react";
+import { TrendingUp, Target } from "lucide-react";
 
 interface SessionStatsProps {
   completedSessions: number;
-  totalExercises: number;
   averagePosture: number;
 }
 
 export const SessionStats = ({ 
   completedSessions, 
-  totalExercises, 
   averagePosture 
 }: SessionStatsProps) => {
   const stats = [
@@ -17,12 +15,6 @@ export const SessionStats = ({
       label: "Sessions Completed",
       value: completedSessions,
       tone: "primary",
-    },
-    {
-      icon: Zap,
-      label: "Total Exercises",
-      value: totalExercises,
-      tone: "secondary",
     },
     {
       icon: TrendingUp,
@@ -37,15 +29,13 @@ export const SessionStats = ({
       {stats.map((stat, index) => {
         const Icon = stat.icon;
         return (
-          <div key={index} className="card stat-card">
-            <div className="row space-between align-center">
-              <div>
-                <p className="muted small">{stat.label}</p>
-                <div className="big-number">{stat.value}</div>
-              </div>
-              <div className={`icon-badge ${stat.tone}`}>
-                <Icon size={20} />
-              </div>
+          <div key={index} className="card stat-card" style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: "0.5rem" }}>
+            <div className="column" style={{ gap: "0.15rem" }}>
+              <p className="muted small">{stat.label}</p>
+              <div className="big-number">{stat.value}</div>
+            </div>
+            <div className={`icon-badge ${stat.tone}`}>
+              <Icon size={20} />
             </div>
           </div>
         );

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Activity, CheckCircle2, Clock, RefreshCw, TrendingUp } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { Timer } from "../components/Timer";
-import { fetchExerciseResults } from "../lib/api";
+import { fetchExerciseResults, fetchSessionStatus } from "../lib/api";
 
 type ExerciseType = "squats" | "pushups" | "situps" | string;
 
@@ -33,6 +33,7 @@ const Break = () => {
   const [breakComplete, setBreakComplete] = useState(false);
   const [results, setResults] = useState<ExerciseResultsResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [liveReps, setLiveReps] = useState(0);
 
   const handleBreakComplete = async () => {
     setBreakComplete(true);
@@ -40,26 +41,53 @@ const Break = () => {
     try {
       const data = await fetchExerciseResults();
       setResults(data as unknown as ExerciseResultsResponse);
+      persistHistory(data as unknown as ExerciseResultsResponse);
     } catch (error) {
       console.error("Failed to fetch exercise results:", error);
+      const parsedDuration = (() => {
+        if (/^\d+:\d{1,2}$/.test(breakDuration.trim())) {
+          const [m, s] = breakDuration.trim().split(":").map(Number);
+          return m * 60 + s;
+        }
+        const num = Number(breakDuration);
+        return Number.isNaN(num) ? 10 * 60 : num * 60;
+      })();
+
       setResults({
         exercise_type: "squats",
-        count: 18,
+        count: liveReps,
         goal: 20,
-        duration: (() => {
-          if (/^\d+:\d{1,2}$/.test(breakDuration.trim())) {
-            const [m, s] = breakDuration.trim().split(":").map(Number);
-            return m * 60 + s;
-          }
-          const num = Number(breakDuration);
-          return Number.isNaN(num) ? 10 * 60 : num * 60;
-        })(),
-        completed: false,
+        duration: parsedDuration,
+        completed: liveReps >= 20,
+      });
+      persistHistory({
+        exerciseType: "squats",
+        count: liveReps,
+        goal: 20,
+        duration: parsedDuration,
+        completed: liveReps >= 20,
       });
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let interval: number | undefined;
+    if (!breakComplete) {
+      interval = window.setInterval(async () => {
+        try {
+          const status = await fetchSessionStatus();
+          if (typeof status.reps === "number") setLiveReps(status.reps);
+        } catch (err) {
+          console.warn("Session status fetch failed", err);
+        }
+      }, 2000);
+    }
+    return () => {
+      if (interval !== undefined) window.clearInterval(interval);
+    };
+  }, [breakComplete]);
 
   if (loading) {
     return (
@@ -73,7 +101,43 @@ const Break = () => {
   }
 
   const exerciseType = results?.exerciseType || results?.exercise_type || "exercise";
-  const progress = results ? Math.min((results.count / results.goal) * 100, 100) : 0;
+  const countValue = results?.count ?? liveReps;
+  const progress = results ? Math.min((countValue / results.goal) * 100, 100) : 0;
+
+  const persistHistory = (entry: ExerciseResultsResponse) => {
+    const stored = localStorage.getItem("sessionHistory");
+    let parsed: Array<Record<string, unknown>> = [];
+    if (stored) {
+      try {
+        parsed = JSON.parse(stored);
+      } catch {
+        parsed = [];
+      }
+    }
+
+    let config: Record<string, unknown> = {};
+    const cfg = localStorage.getItem("currentSessionConfig");
+    if (cfg) {
+      try {
+        config = JSON.parse(cfg);
+      } catch {
+        config = {};
+      }
+    }
+
+    parsed.push({
+      ...config,
+      title: config.title || undefined,
+      exerciseType: exerciseType || "exercise",
+      reps: entry.count,
+      goal: entry.goal,
+      duration: entry.duration,
+      completed: entry.completed,
+      timestamp: Date.now(),
+    });
+
+    localStorage.setItem("sessionHistory", JSON.stringify(parsed));
+  };
   const goHomeAndIncrement = () => {
     localStorage.setItem("completedSessionsIncrement", "1");
     navigate("/");
@@ -90,6 +154,9 @@ const Break = () => {
 
           <div style={{ maxWidth: "900px", margin: "0 auto 2rem" }}>
             <Timer sessionType="break" duration={breakDuration} onSessionComplete={handleBreakComplete} />
+            <p className="muted small" style={{ textAlign: "center", marginTop: "0.5rem" }}>
+              Live reps recorded: {liveReps}
+            </p>
           </div>
 
           <Card
@@ -190,7 +257,7 @@ const Break = () => {
             {String(exerciseType).toUpperCase()}
           </p>
           <div className="row align-center" style={{ gap: "0.5rem" }}>
-            <span style={{ fontSize: "3rem", fontWeight: 800, color: "#f97316" }}>{results.count}</span>
+            <span style={{ fontSize: "3rem", fontWeight: 800, color: "#f97316" }}>{countValue}</span>
             <span className="muted" style={{ fontSize: "1.5rem" }}>/ {results.goal}</span>
           </div>
           <div className="row align-center" style={{ gap: "0.5rem", color: "#475467" }}>

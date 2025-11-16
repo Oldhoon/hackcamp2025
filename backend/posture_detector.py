@@ -19,8 +19,6 @@ from mediapipe.framework.formats import landmark_pb2
 
 @dataclass
 class PostureResult:
-    """Container for the derived posture metrics."""
-
     label: str
     score: float
     neck_angle: float
@@ -30,8 +28,6 @@ class PostureResult:
 
 
 class PostureDetector:
-    """Estimate posture quality by comparing body angles against thresholds."""
-
     def __init__(
         self,
         neck_threshold: float = 18.0,
@@ -93,6 +89,14 @@ class PostureDetector:
             bad_frames=self.bad_frames,
         )
 
+    def score_only(
+        self, landmarks: Iterable[landmark_pb2.NormalizedLandmark]
+    ) -> Optional[float]:
+        """Convenience helper that returns just the smoothed posture score."""
+
+        result = self.analyze(landmarks)
+        return result.score if result else None
+
     def annotate(self, frame, result: PostureResult) -> None:
         """Overlay posture data on a frame."""
 
@@ -153,6 +157,8 @@ def main() -> None:
     detector = PostureDetector()
     mp_pose = mp.solutions.pose
     drawing_utils = mp.solutions.drawing_utils
+    
+    SHOW_LANDMARKS = False
 
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -177,17 +183,18 @@ def main() -> None:
             rgb.flags.writeable = True
 
             if results.pose_landmarks:
-                drawing_utils.draw_landmarks(
-                    frame,
-                    results.pose_landmarks,
-                    mp_pose.POSE_CONNECTIONS,
-                    drawing_utils.DrawingSpec(
-                        color=(0, 255, 255), thickness=3, circle_radius=4
-                    ),
-                    drawing_utils.DrawingSpec(
-                        color=(0, 128, 255), thickness=3, circle_radius=2
-                    ),
-                )
+                if SHOW_LANDMARKS:
+                    drawing_utils.draw_landmarks(
+                        frame,
+                        results.pose_landmarks,
+                        mp_pose.POSE_CONNECTIONS,
+                        drawing_utils.DrawingSpec(
+                            color=(0, 255, 0), thickness=3, circle_radius=4
+                        ),
+                        drawing_utils.DrawingSpec(
+                            color=(0, 0, 255), thickness=3, circle_radius=2
+                        ),
+                    )
                 posture = detector.analyze(results.pose_landmarks.landmark)
                 if posture:
                     detector.annotate(frame, posture)

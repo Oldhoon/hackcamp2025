@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Timer } from "../components/Timer";
 import { PostureMonitor } from "../components/PostureMonitor";
 import { SessionStats } from "../components/SessionStats";
@@ -11,8 +11,10 @@ import { useNavigate } from "react-router-dom";
 
 const Index = () => {
   const [sessionStarted, setSessionStarted] = useState(false);
-  const [focusDuration, setFocusDuration] = useState<string>("50");
-  const [breakDuration, setBreakDuration] = useState<string>("10");
+  const [focusMinutes, setFocusMinutes] = useState<string>("50");
+  const [focusSeconds, setFocusSeconds] = useState<string>("00");
+  const [breakMinutes, setBreakMinutes] = useState<string>("10");
+  const [breakSeconds, setBreakSeconds] = useState<string>("00");
   const [stats, setStats] = useState({
     completedSessions: 0,
     totalExercises: 0,
@@ -20,6 +22,33 @@ const Index = () => {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const queued = Number(localStorage.getItem("completedSessionsIncrement") || "0");
+    if (queued > 0) {
+      setTimeout(() => {
+        setStats((prev) => ({
+          ...prev,
+          completedSessions: prev.completedSessions + queued,
+        }));
+        localStorage.removeItem("completedSessionsIncrement");
+      }, 0);
+    }
+  }, []);
+
+  const toSeconds = (mins: string, secs: string, fallbackMinutes: number) => {
+    const m = Number(mins);
+    const s = Number(secs);
+    const validM = Number.isNaN(m) ? fallbackMinutes : m;
+    const validS = Number.isNaN(s) ? 0 : s;
+    return validM * 60 + Math.min(Math.max(validS, 0), 59);
+  };
+
+  const formatMMSS = (mins: string, secs: string, fallbackMinutes: number) => {
+    const m = Number.isNaN(Number(mins)) ? fallbackMinutes : Math.max(Number(mins), 0);
+    const s = Number.isNaN(Number(secs)) ? 0 : Math.min(Math.max(Number(secs), 0), 59);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
 
   const handleSessionComplete = () => {
     setStats((prev) => ({
@@ -30,16 +59,18 @@ const Index = () => {
       title: "Focus session complete! 🎉",
       description: "Time for an active break!",
     });
-    navigate(`/break?duration=${Number(breakDuration) || 10}`);
+    const breakParam = formatMMSS(breakMinutes, breakSeconds, 10);
+    navigate(`/break?duration=${encodeURIComponent(breakParam)}`);
   };
 
   const handleStartSession = () => {
-    const focusVal = Number(focusDuration);
-    const breakVal = Number(breakDuration);
-    if (!focusDuration || focusVal < 1 || !breakDuration || breakVal < 1) {
+    const focusSecondsTotal = toSeconds(focusMinutes, focusSeconds, 50);
+    const breakSecondsTotal = toSeconds(breakMinutes, breakSeconds, 10);
+
+    if (focusSecondsTotal < 1 || breakSecondsTotal < 1) {
       toast({
         title: "Invalid duration",
-        description: "Both durations must be at least 1 minute",
+        description: "Durations must be greater than zero",
         variant: "destructive",
       });
       return;
@@ -47,7 +78,7 @@ const Index = () => {
     setSessionStarted(true);
     toast({
       title: "Session started! 🎯",
-      description: `${focusVal} min focus, then ${breakVal} min break`,
+      description: `${Math.round(focusSecondsTotal / 60)} min focus, then ${Math.round(breakSecondsTotal / 60)} min break`,
     });
   };
 
@@ -72,53 +103,59 @@ const Index = () => {
         </header>
 
         {!sessionStarted ? (
-          <div className="column" style={{ gap: "1.5rem", maxWidth: "900px", margin: "0 auto" }}>
-            <Card className="column" style={{ gap: "1.5rem", padding: "2rem", boxShadow: "0 18px 40px rgba(37,99,235,0.1)" }}>
-              <div className="text-center column" style={{ gap: "0.5rem" }}>
-                <div
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    borderRadius: "50%",
-                    background: "linear-gradient(135deg,#2563eb,#60a5fa)",
-                    display: "grid",
-                    placeItems: "center",
-                    margin: "0 auto",
-                    boxShadow: "0 12px 30px rgba(37,99,235,0.3)",
-                  }}
-                >
-                  <Settings color="#fff" size={32} />
-                </div>
-                <h2 style={{ margin: 0 }}>Setup Your Session</h2>
+          <div className="column" style={{ gap: "1.5rem", maxWidth: "980px", margin: "0 auto" }}>
+            <Card className="setup-card">
+              <div className="setup-badge">
+                <Settings color="#fff" size={28} />
+              </div>
+              <div className="text-center column" style={{ gap: "0.35rem", marginBottom: "1rem" }}>
+                <h2 className="setup-title">Setup Your Session</h2>
                 <p className="muted">Customize your Pomodoro timer to fit your workflow</p>
               </div>
 
-              <div className="column" style={{ gap: "1rem" }}>
-                <div className="column" style={{ gap: "0.25rem" }}>
-                  <label className="small emphasis">Focus Time (minutes)</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={120}
-                    value={focusDuration}
-                    onChange={(e) => setFocusDuration(e.target.value)}
-                  />
-                  <p className="muted small">Recommended: 25-50 minutes for optimal focus</p>
+              <div className="grid two-cols">
+                <div className="column" style={{ gap: "0.35rem" }}>
+                  <label className="small emphasis">Focus Time</label>
+                  <div className="row time-inputs">
+                    <Input
+                      type="text"
+                      value={focusMinutes}
+                      onChange={(e) => setFocusMinutes(e.target.value)}
+                      placeholder="MM"
+                    />
+                    <span className="emphasis">:</span>
+                    <Input
+                      type="text"
+                      value={focusSeconds}
+                      onChange={(e) => setFocusSeconds(e.target.value)}
+                      placeholder="SS"
+                    />
+                  </div>
+                  <p className="muted small">Enter minutes and seconds (e.g., 25 : 30)</p>
                 </div>
-                <div className="column" style={{ gap: "0.25rem" }}>
-                  <label className="small emphasis">Active Break (minutes)</label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={30}
-                    value={breakDuration}
-                    onChange={(e) => setBreakDuration(e.target.value)}
-                  />
-                  <p className="muted small">Recommended: 5-15 minutes for exercise and movement</p>
+
+                <div className="column" style={{ gap: "0.35rem" }}>
+                  <label className="small emphasis">Active Break</label>
+                  <div className="row time-inputs">
+                    <Input
+                      type="text"
+                      value={breakMinutes}
+                      onChange={(e) => setBreakMinutes(e.target.value)}
+                      placeholder="MM"
+                    />
+                    <span className="emphasis">:</span>
+                    <Input
+                      type="text"
+                      value={breakSeconds}
+                      onChange={(e) => setBreakSeconds(e.target.value)}
+                      placeholder="SS"
+                    />
+                  </div>
+                  <p className="muted small">Enter minutes and seconds (e.g., 10 : 30)</p>
                 </div>
               </div>
 
-              <Button onClick={handleStartSession} size="lg" className="w-full">
+              <Button onClick={handleStartSession} size="lg" className="w-full primary-cta">
                 <Play className="icon-left" /> Start Focus Session
               </Button>
             </Card>
@@ -136,7 +173,11 @@ const Index = () => {
             <SessionStats {...stats} />
 
             <div className="split">
-              <Timer sessionType="focus" duration={Number(focusDuration)} onSessionComplete={handleSessionComplete} />
+              <Timer
+                sessionType="focus"
+                duration={formatMMSS(focusMinutes, focusSeconds, 50)}
+                onSessionComplete={handleSessionComplete}
+              />
               <PostureMonitor />
             </div>
           </div>

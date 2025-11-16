@@ -28,7 +28,7 @@ const formatDuration = (duration: number | string) => {
 const Break = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const breakDuration = Number(searchParams.get("duration")) || 10;
+  const breakDuration = searchParams.get("duration") || "10";
 
   const [breakComplete, setBreakComplete] = useState(false);
   const [results, setResults] = useState<ExerciseResultsResponse | null>(null);
@@ -46,7 +46,14 @@ const Break = () => {
         exercise_type: "squats",
         count: 18,
         goal: 20,
-        duration: breakDuration * 60,
+        duration: (() => {
+          if (/^\d+:\d{1,2}$/.test(breakDuration.trim())) {
+            const [m, s] = breakDuration.trim().split(":").map(Number);
+            return m * 60 + s;
+          }
+          const num = Number(breakDuration);
+          return Number.isNaN(num) ? 10 * 60 : num * 60;
+        })(),
         completed: false,
       });
     } finally {
@@ -67,6 +74,10 @@ const Break = () => {
 
   const exerciseType = results?.exerciseType || results?.exercise_type || "exercise";
   const progress = results ? Math.min((results.count / results.goal) * 100, 100) : 0;
+  const goHomeAndIncrement = () => {
+    localStorage.setItem("completedSessionsIncrement", "1");
+    navigate("/");
+  };
 
   if (!breakComplete) {
     return (
@@ -220,7 +231,7 @@ const Break = () => {
           </div>
         </div>
 
-        <Button onClick={() => navigate("/")} size="lg" className="w-full">
+        <Button onClick={goHomeAndIncrement} size="lg" className="w-full">
           <RefreshCw className="icon-left" /> Start New Focus Session
         </Button>
       </Card>

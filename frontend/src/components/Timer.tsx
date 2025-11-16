@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Play, Pause, RotateCcw } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
@@ -35,29 +35,38 @@ export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) 
   const initialTime = parseDurationToSeconds(duration);
   const [timeLeft, setTimeLeft] = useState(initialTime);
   const [isRunning, setIsRunning] = useState(false);
+  const endTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     setTimeLeft(initialTime);
     setIsRunning(false);
+    endTimeRef.current = null;
   }, [sessionType, initialTime]);
 
   useEffect(() => {
-    const interval: number | undefined = isRunning
-      ? window.setInterval(() => {
-          setTimeLeft((prev) => {
-            if (prev <= 1) {
-              setIsRunning(false);
-              onSessionComplete();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000)
-      : undefined;
+    if (!isRunning) return;
+
+    // Anchor to wall-clock time to reduce drift.
+    if (endTimeRef.current === null) {
+      endTimeRef.current = Date.now() + timeLeft * 1000;
+    }
+
+    const interval = window.setInterval(() => {
+      if (endTimeRef.current === null) return;
+      const remainingMs = endTimeRef.current - Date.now();
+      const next = Math.max(0, Math.round(remainingMs / 1000));
+      setTimeLeft(next);
+      if (next <= 0) {
+        setIsRunning(false);
+        endTimeRef.current = null;
+        onSessionComplete();
+      }
+    }, 500);
+
     return () => {
-      if (interval !== undefined) window.clearInterval(interval);
+      window.clearInterval(interval);
     };
-  }, [isRunning, onSessionComplete]);
+  }, [isRunning, onSessionComplete, timeLeft]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
@@ -165,7 +174,11 @@ export const Timer = ({ sessionType, duration, onSessionComplete }: TimerProps) 
             )}
           </Button>
           <Button
-            onClick={() => { setTimeLeft(initialTime); setIsRunning(false); }}
+            onClick={() => {
+              setTimeLeft(initialTime);
+              setIsRunning(false);
+              endTimeRef.current = null;
+            }}
             size="lg"
             variant="outline"
             className="btn-pill"

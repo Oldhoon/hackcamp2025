@@ -162,6 +162,10 @@ const Index = () => {
     setSessionStarted(false);
   };
 
+  const resetCompletedSessions = () => {
+    setStats((prev) => ({ ...prev, completedSessions: 0 }));
+  };
+
   // Collect posture scores during an active focus session to compute average
   useEffect(() => {
     if (!sessionStarted) {
@@ -270,18 +274,30 @@ const Index = () => {
             <SessionStats {...stats} />
 
             <Card className="column" style={{ gap: "0.75rem" }}>
-              <h3 className="emphasis" style={{ margin: 0 }}>Recent Sessions</h3>
-              <div className="row" style={{ justifyContent: "flex-end" }}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setHistory([]);
-                    localStorage.removeItem("sessionHistory");
-                  }}
-                >
-                  Clear History
-                </Button>
+              <div
+                className="row"
+                style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}
+              >
+                <h3 className="emphasis" style={{ margin: 0 }}>Recent Sessions</h3>
+                <div className="row" style={{ gap: "0.5rem" }}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetCompletedSessions}
+                  >
+                    Reset Sessions Done
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setHistory([]);
+                      localStorage.removeItem("sessionHistory");
+                    }}
+                  >
+                    Clear History
+                  </Button>
+                </div>
               </div>
               {history.length === 0 ? (
                 <p className="muted small" style={{ margin: 0 }}>No session history yet.</p>

@@ -7,8 +7,8 @@ class PosePipeline:
     def __init__(
         self,
         camera_index: int = 0,
-        frame_width: int = 1024,
-        frame_height: int = 600,
+        frame_width: int = 1280,
+        frame_height: int = 720,
         min_detection_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
         draw_landmarks: bool = True,
@@ -72,4 +72,3 @@ class PosePipeline:
     def release(self):
         self.cap.release()
         self.pose.close()
-        cv2.destroyAllWindows()

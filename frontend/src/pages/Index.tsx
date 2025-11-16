@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Timer } from "../components/Timer";
 import { PostureMonitor } from "../components/PostureMonitor";
 import { SessionStats } from "../components/SessionStats";
+import { CameraPreview } from "../components/CameraPreview";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card } from "../components/ui/card";
 import { Play, Settings } from "lucide-react";
 import { useToast } from "../hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { startSession, stopSession, fetchSessionStatus } from "../lib/api";
 
 const Index = () => {
   const [sessionStarted, setSessionStarted] = useState(false);
@@ -23,13 +25,19 @@ const Index = () => {
       try {
         return JSON.parse(saved);
       } catch {
-        // fall through to default
+        // ignore parse errors
       }
     }
-    return { completedSessions: 0, averagePosture: 85 };
+    return { completedSessions: 0, averagePosture: 0 };
   });
+  const [isStartingSession, setIsStartingSession] = useState(false);
+  const postureSumRef = useRef(0);
+  const postureCountRef = useRef(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const landmarkStreamUrl =
+    (import.meta.env.VITE_LANDMARK_STREAM_URL as string | undefined) ||
+    `${window.location.protocol}//${window.location.hostname}:8000/session/preview`;
 
   useEffect(() => {
     const queued = Number(localStorage.getItem("completedSessionsIncrement") || "0");
@@ -75,7 +83,17 @@ const Index = () => {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleSessionComplete = () => {
+  const handleSessionComplete = async () => {
+    try {
+      await stopSession();
+    } catch (error) {
+      console.error("Failed to stop backend session:", error);
+    }
+    const sessionAvg = postureCountRef.current
+      ? Math.round(postureSumRef.current / postureCountRef.current)
+      : stats.averagePosture;
+    localStorage.setItem("lastPostureAverage", String(sessionAvg));
+
     setStats((prev) => ({
       ...prev,
       completedSessions: prev.completedSessions + 1,
@@ -88,7 +106,7 @@ const Index = () => {
     navigate(`/break?duration=${encodeURIComponent(breakParam)}`);
   };
 
-  const handleStartSession = () => {
+  const handleStartSession = async () => {
     const focusSecondsTotal = toSeconds(focusMinutes, focusSeconds, 50);
     const breakSecondsTotal = toSeconds(breakMinutes, breakSeconds, 10);
     const titleTrimmed = sessionTitle.trim();
@@ -101,11 +119,6 @@ const Index = () => {
       });
       return;
     }
-    setSessionStarted(true);
-    toast({
-      title: "Session started! 🎯",
-      description: `${Math.round(focusSecondsTotal / 60)} min focus, then ${Math.round(breakSecondsTotal / 60)} min break`,
-    });
 
     const currentConfig = {
       title: titleTrimmed || undefined,
@@ -114,11 +127,69 @@ const Index = () => {
       startedAt: Date.now(),
     };
     localStorage.setItem("currentSessionConfig", JSON.stringify(currentConfig));
+    localStorage.removeItem("lastPostureAverage");
+
+    postureSumRef.current = 0;
+    postureCountRef.current = 0;
+    setStats((prev) => ({ ...prev, averagePosture: 0 }));
+
+    setIsStartingSession(true);
+    try {
+      await startSession({ focus_seconds: focusSecondsTotal, break_seconds: breakSecondsTotal });
+      setSessionStarted(true);
+      toast({
+        title: "Session started! 🎯",
+        description: `${Math.round(focusSecondsTotal / 60)} min focus, then ${Math.round(breakSecondsTotal / 60)} min break`,
+      });
+    } catch (error) {
+      console.error("Failed to start backend session:", error);
+      toast({
+        title: "Unable to start session",
+        description: "Make sure the backend server is running.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStartingSession(false);
+    }
   };
 
-  const handleReconfigure = () => {
+  const handleReconfigure = async () => {
+    try {
+      await stopSession();
+    } catch (error) {
+      console.error("Failed to stop backend session:", error);
+    }
     setSessionStarted(false);
   };
+
+  // Collect posture scores during an active focus session to compute average
+  useEffect(() => {
+    if (!sessionStarted) {
+      postureSumRef.current = 0;
+      postureCountRef.current = 0;
+      setStats((prev) => ({ ...prev, averagePosture: 0 }));
+      return;
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const status = await fetchSessionStatus();
+        if (typeof status.posture_score === "number") {
+          const val = status.posture_score <= 1 ? status.posture_score * 100 : status.posture_score;
+          postureSumRef.current += val;
+          postureCountRef.current += 1;
+          const avg = Math.round(postureSumRef.current / postureCountRef.current);
+          setStats((prev) => ({ ...prev, averagePosture: avg }));
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [sessionStarted]);
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(135deg,#e0f2ff,#f8fafc)" }}>
@@ -191,7 +262,7 @@ const Index = () => {
                 </div>
               </div>
 
-              <Button onClick={handleStartSession} size="lg" className="w-full primary-cta">
+              <Button onClick={handleStartSession} size="lg" className="w-full primary-cta" disabled={isStartingSession}>
                 <Play className="icon-left" /> Start Focus Session
               </Button>
             </Card>
@@ -227,6 +298,9 @@ const Index = () => {
                         <span className="muted small">
                           Focus {item.focus as string || "-"} / Break {item.break as string || "-"}
                         </span>
+                        {item.postureAverage !== undefined && (
+                          <span className="muted small">Posture Avg: {item.postureAverage}%</span>
+                        )}
                       </div>
                       <div className="column" style={{ textAlign: "right", gap: "0.15rem" }}>
                         <span className="emphasis">{item.reps ?? 0} reps</span>
@@ -256,7 +330,10 @@ const Index = () => {
                 duration={formatMMSS(focusMinutes, focusSeconds, 50)}
                 onSessionComplete={handleSessionComplete}
               />
-              <PostureMonitor />
+              <div className="column" style={{ gap: "1rem" }}>
+                <CameraPreview active={sessionStarted} streamUrl={landmarkStreamUrl} />
+                <PostureMonitor />
+              </div>
             </div>
           </div>
         )}

@@ -5,7 +5,8 @@ import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
 import { Timer } from "../components/Timer";
-import { fetchExerciseResults, fetchSessionStatus } from "../lib/api";
+import { CameraPreview } from "../components/CameraPreview";
+import { fetchExerciseResults, fetchSessionStatus, startSession, stopSession } from "../lib/api";
 
 type ExerciseType = "squats" | "pushups" | "situps" | string;
 
@@ -34,6 +35,36 @@ const Break = () => {
   const [results, setResults] = useState<ExerciseResultsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [liveReps, setLiveReps] = useState(0);
+  const landmarkStreamUrl =
+    (import.meta.env.VITE_LANDMARK_STREAM_URL as string | undefined) ||
+    `${window.location.protocol}//${window.location.hostname}:8000/session/preview`;
+  const [streamActive, setStreamActive] = useState(false);
+
+  const parseDurationSeconds = (val: string, fallback: number) => {
+    if (/^\d+:\d{1,2}$/.test(val.trim())) {
+      const [m, s] = val.trim().split(":").map(Number);
+      return m * 60 + s;
+    }
+    const num = Number(val);
+    return Number.isNaN(num) ? fallback : num * 60;
+  };
+
+  useEffect(() => {
+    const start = async () => {
+      try {
+        const seconds = parseDurationSeconds(breakDuration, 10 * 60);
+        await startSession({ focus_seconds: 0, break_seconds: seconds, mode: "break" });
+        setStreamActive(true);
+      } catch (err) {
+        console.error("Failed to start backend break session:", err);
+      }
+    };
+    start();
+    return () => {
+      stopSession().catch(() => {});
+      setStreamActive(false);
+    };
+  }, [breakDuration]);
 
   const handleBreakComplete = async () => {
     setBreakComplete(true);
@@ -125,18 +156,32 @@ const Break = () => {
       }
     }
 
+    const startedAt = typeof config.startedAt === "number" ? config.startedAt : undefined;
+    const alreadyLogged = startedAt
+      ? parsed.some((item) => (item as { startedAt?: unknown }).startedAt === startedAt)
+      : false;
+    if (alreadyLogged) return;
+
+    const exerciseFromEntry = entry.exerciseType || entry.exercise_type || exerciseType || "exercise";
+
     parsed.push({
       ...config,
-      title: config.title || undefined,
-      exerciseType: exerciseType || "exercise",
+      title: config.title || "Session",
+      exerciseType: exerciseFromEntry,
       reps: entry.count,
       goal: entry.goal,
       duration: entry.duration,
+      postureAverage: (() => {
+        const saved = localStorage.getItem("lastPostureAverage");
+        return saved ? Number(saved) : undefined;
+      })(),
       completed: entry.completed,
       timestamp: Date.now(),
+      startedAt,
     });
 
     localStorage.setItem("sessionHistory", JSON.stringify(parsed));
+    localStorage.removeItem("currentSessionConfig");
   };
   const goHomeAndIncrement = () => {
     localStorage.setItem("completedSessionsIncrement", "1");
@@ -157,6 +202,9 @@ const Break = () => {
             <p className="muted small" style={{ textAlign: "center", marginTop: "0.5rem" }}>
               Live reps recorded: {liveReps}
             </p>
+          </div>
+          <div style={{ maxWidth: "900px", margin: "0 auto 2rem" }}>
+            <CameraPreview active={!breakComplete && streamActive} streamUrl={landmarkStreamUrl} title="Live Landmarks" />
           </div>
 
           <Card

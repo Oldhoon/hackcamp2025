@@ -1,11 +1,14 @@
 # Session state management
 import time
+import cv2
 from fastapi import FastAPI, BackgroundTasks
 from pydantic import BaseModel
 
 from backend.exercise_counter import SquatCounter
 from backend.pose_pipeline import PosePipeline
 from backend.posture_detector import PostureDetector
+
+SHOW_PREVIEW = True
 
 app = FastAPI()
 
@@ -61,6 +64,12 @@ def session_loop(config: SessionConfig):
             if frame is None:
                 break
 
+            if SHOW_PREVIEW:
+                cv2.imshow("Session Preview", frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    session_state.running = False
+                    break
+
             if landmarks is not None:
                 result = counter.update(landmarks)
                 session_state.reps = result.reps
@@ -82,6 +91,8 @@ def session_loop(config: SessionConfig):
         session_state.mode = "idle"
         session_state.remaining = 0
         pipeline.release()
+        if SHOW_PREVIEW:
+            cv2.destroyWindow("Session Preview")
 
 
 @app.post("/session/start")
@@ -104,3 +115,4 @@ def get_status():
 def stop_session():
     session_state.running = False
     return {"status": "stopping"}
+
